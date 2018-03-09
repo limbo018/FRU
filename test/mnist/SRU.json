@@ -6,7 +6,7 @@
     "freqs_mask": 1.0, 
     "load_model": 0, 
     "cell": "SRU", 
-    "model_dir": "results/model", 
+    "model_dir": "results/mnist/SRU/model", 
     "r_size": 60, 
     "train_flag": 1, 
     "input_size": 1, 
@@ -24,5 +24,6 @@
     "num_units": 200, 
     "batch_norm": 0, 
     "pred_dir": "results/mnist/SRU", 
-    "regression_flag": 0
+    "regression_flag": 0,
+    "compute_initial_state_grad" : 0
 }
