@@ -7,7 +7,7 @@
     "freqs_mask": 1.0, 
     "load_model": 0, 
     "cell": "RNN", 
-    "model_dir": "results/model", 
+    "model_dir": "results/poly/degree5_npoly5/RNN/model", 
     "r_size": 60, 
     "train_flag": 1, 
     "input_size": 1, 
@@ -27,6 +27,7 @@
     "initial_learning_rate": 0.001, 
     "num_units": 200, 
     "batch_norm": 0, 
-    "pred_dir": "results/pred", 
-    "regression_flag": 1
+    "pred_dir": "results/poly/degree5_npoly5/RNN", 
+    "regression_flag": 1,
+    "compute_initial_state_grad" : 0
 }

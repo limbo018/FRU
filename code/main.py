@@ -23,7 +23,6 @@ def train(params):
         train_X, test_X, train_y, test_y = load.load_mnist(params)
     elif params.dataset.startswith('sine_synthetic') and not params.dataset.startswith('sine_synthetic_out'): 
         train_X, test_X, train_y, test_y = load.load_sine_synthetic(params)
-        train_X, test_X, train_y, test_y = load.load_ucr(params)
     elif params.dataset.startswith('poly_synthetic'): 
         train_X, test_X, train_y, test_y = load.load_poly_synthetic(params)
     else:

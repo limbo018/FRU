@@ -42,6 +42,7 @@ class Params (object):
         self.max_grad_norm = 0 # for gradient clipping, only valid when positive  
         self.vocabulary_size = 10000 # vocabulary size for ptb dataset 
         self.tune_flag = False # tune mode, track accuracy and exit early if not good  
+        self.compute_initial_state_grad = False # whether computer gradients for initial state
     """
     convert to json  
     """
@@ -77,6 +78,7 @@ class Params (object):
         data['max_grad_norm'] = self.max_grad_norm
         data['vocabulary_size'] = self.vocabulary_size
         data['tune_flag'] = self.tune_flag
+        data['compute_initial_state_grad'] = self.compute_initial_state_grad
         return data 
     """
     load form json 
@@ -112,6 +114,7 @@ class Params (object):
         if 'max_grad_norm' in data: self.max_grad_norm = data['max_grad_norm']
         if 'vocabulary_size' in data: self.vocabulary_size = data['vocabulary_size']
         if 'tune_flag' in data: self.tune_flag = data['tune_flag']
+        if 'compute_initial_state_grad' in data: self.compute_initial_state_grad = data['compute_initial_state_grad']
 
     """
     dump to json file 
