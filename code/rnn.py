@@ -10,6 +10,8 @@ import numpy as np
 import sru
 import fru 
 import Params  
+from tensorflow.python.ops import array_ops
+from tensorflow.python.util import nest
 
 class RNNModel (object):
     def __init__(self, params):
@@ -138,7 +140,36 @@ class RNNModel (object):
         # assume time_steps is on axis 1
         x = tf.unstack(x, params.time_steps, 1)
         # get RNN cell output 
-        output, states = tf.contrib.rnn.static_rnn(self.rnn_cell, x, dtype=np.float32)
+        if params.compute_initial_state_grad: 
+            inputs = x
+            first_input = inputs
+            while nest.is_sequence(first_input):
+                first_input = first_input[0]
+            if first_input.get_shape().ndims != 1:
+                input_shape = first_input.get_shape().with_rank_at_least(2)
+                fixed_batch_size = input_shape[0]
+                
+                flat_inputs = nest.flatten(inputs)
+                for flat_input in flat_inputs:
+                    input_shape = flat_input.get_shape().with_rank_at_least(2)
+                    batch_size, input_size = input_shape[0], input_shape[1:]
+                    fixed_batch_size.merge_with(batch_size)
+                    for i, size in enumerate(input_size):
+                        if size.value is None:
+                            raise ValueError(
+                                    "Input size (dimension %d of inputs) must be accessible via "
+                                    "shape inference, but saw value None." % i)
+            else:
+              fixed_batch_size = first_input.get_shape().with_rank_at_least(1)[0]
+
+            if fixed_batch_size.value:
+                batch_size = fixed_batch_size.value
+            else:
+                batch_size = array_ops.shape(first_input)[0]
+            self.initial_state = self.rnn_cell.zero_state(batch_size, dtype=np.float32)
+            output, states = tf.contrib.rnn.static_rnn(self.rnn_cell, x, initial_state=self.initial_state, dtype=np.float32)
+        else:
+            output, states = tf.contrib.rnn.static_rnn(self.rnn_cell, x, dtype=np.float32)
         # linear activation, using rnn inner loop last output 
         logits = tf.matmul(output[-1], last_w) + last_b
         print "output[-1].shape = ", output[-1].get_shape() 
@@ -157,6 +188,7 @@ class RNNModel (object):
         #optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
         optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         if params.max_grad_norm > 0: 
+            print("clip gradients")
             tvars = tf.trainable_variables()
             grads, _ = tf.clip_by_global_norm(tf.gradients(self.loss_op, tvars), params.max_grad_norm)
             train_op = optimizer.apply_gradients(
@@ -165,11 +197,40 @@ class RNNModel (object):
         else: 
             train_op = optimizer.minimize(self.loss_op)
 
+        if params.compute_initial_state_grad: 
+            initial_state_grads = []
+            if params.regression_flag: 
+                for gi in range(0, params.output_size, 20): 
+                    print gi 
+                    if isinstance(self.initial_state, tf.contrib.rnn.LSTMStateTuple): 
+                        #initial_state_grads = [tf.gradients(self.loss_op, self.initial_state.h), tf.gradients(self.loss_op, self.initial_state.c)]
+                        initial_state_grads.append([tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state.h), tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state.c)])
+                    else:
+                        #initial_state_grads = tf.gradients(self.loss_op, self.initial_state)
+                        initial_state_grads.append(tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state))
+            else:
+                print("gradients for regression")
+                if isinstance(self.initial_state, tf.contrib.rnn.LSTMStateTuple): 
+                    #initial_state_grads = [tf.gradients(self.loss_op, self.initial_state.h), tf.gradients(self.loss_op, self.initial_state.c)]
+                    initial_state_grads = tf.gradients(self.loss_op, tf.trainable_variables())
+                else:
+                    initial_state_grads = tf.gradients(self.loss_op, self.initial_state)
+
         # Initialize the variables (i.e. assign their default value)
         init = tf.global_variables_initializer()
 
         # Start training 
         self.session.run(init)
+
+        if params.compute_initial_state_grad: 
+            initial_weights = self.session.run(tf.trainable_variables())
+            print "initial_weights shape = ", len(initial_weights)
+            opt = np.get_printoptions()
+            np.set_printoptions(threshold='nan')
+            for index, weights in enumerate(initial_weights): 
+                print "initial_weights[%d] shape = %s" % (index, weights.shape)
+                print weights
+            np.set_printoptions(**opt)
 
         # only initialize if not train 
         if not params.train_flag: 
@@ -203,7 +264,25 @@ class RNNModel (object):
                         self.learning_rate: learning_rate, 
                         self.dropout_keep_rate: params.dropout_keep_rate}
                 # Run optimization op (backprop)
-                self.session.run(train_op, feed_dict=feed_dict)
+                if params.compute_initial_state_grad and epoch in [0, 1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90] and batch_index == 0: 
+                    initial_state_grads_values, _ = self.session.run([initial_state_grads, train_op], feed_dict=feed_dict)
+                    for gi in range(len(initial_state_grads_values)): 
+                        initial_state_grads_value = np.array(initial_state_grads_values[gi]).ravel()
+                        #print "[%d]" % (gi)
+                        #print initial_state_grads_value
+                        l1_norm = np.linalg.norm(initial_state_grads_value, ord=1)
+                        l2_norm = np.linalg.norm(initial_state_grads_value, ord=None)
+                        linf_norm = np.linalg.norm(initial_state_grads_value, ord=np.inf)
+                        lninf_norm = np.linalg.norm(initial_state_grads_value, ord=-np.inf)
+                        print "initial_state_grads_values[%d] l1 = %.6f, l2 = %.6f, linf = %.6f, lninf = %.6f" % (
+                                gi, 
+                                l1_norm, 
+                                l2_norm, 
+                                linf_norm, 
+                                lninf_norm
+                                )
+                else:
+                    self.session.run(train_op, feed_dict=feed_dict)
                 batch_index += 1
                 iterations += 1
 
