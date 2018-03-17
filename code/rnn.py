@@ -188,6 +188,7 @@ class RNNModel (object):
         #optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
         optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         if params.max_grad_norm > 0: 
+            print("clip gradients")
             tvars = tf.trainable_variables()
             grads, _ = tf.clip_by_global_norm(tf.gradients(self.loss_op, tvars), params.max_grad_norm)
             train_op = optimizer.apply_gradients(
@@ -198,14 +199,22 @@ class RNNModel (object):
 
         if params.compute_initial_state_grad: 
             initial_state_grads = []
-            for gi in range(0, params.output_size, 20): 
-                print gi 
+            if params.regression_flag: 
+                for gi in range(0, params.output_size, 20): 
+                    print gi 
+                    if isinstance(self.initial_state, tf.contrib.rnn.LSTMStateTuple): 
+                        #initial_state_grads = [tf.gradients(self.loss_op, self.initial_state.h), tf.gradients(self.loss_op, self.initial_state.c)]
+                        initial_state_grads.append([tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state.h), tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state.c)])
+                    else:
+                        #initial_state_grads = tf.gradients(self.loss_op, self.initial_state)
+                        initial_state_grads.append(tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state))
+            else:
+                print("gradients for regression")
                 if isinstance(self.initial_state, tf.contrib.rnn.LSTMStateTuple): 
                     #initial_state_grads = [tf.gradients(self.loss_op, self.initial_state.h), tf.gradients(self.loss_op, self.initial_state.c)]
-                    initial_state_grads.append([tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state.h), tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state.c)])
+                    initial_state_grads = tf.gradients(self.loss_op, tf.trainable_variables())
                 else:
-                    #initial_state_grads = tf.gradients(self.loss_op, self.initial_state)
-                    initial_state_grads.append(tf.gradients(tf.reduce_mean(tf.pow(self.pred[:, gi:min(gi+20, params.output_size)]-self.y[:, gi:min(gi+20, params.output_size)], 2)), self.initial_state))
+                    initial_state_grads = tf.gradients(self.loss_op, self.initial_state)
 
         # Initialize the variables (i.e. assign their default value)
         init = tf.global_variables_initializer()
@@ -259,6 +268,8 @@ class RNNModel (object):
                     initial_state_grads_values, _ = self.session.run([initial_state_grads, train_op], feed_dict=feed_dict)
                     for gi in range(len(initial_state_grads_values)): 
                         initial_state_grads_value = np.array(initial_state_grads_values[gi]).ravel()
+                        #print "[%d]" % (gi)
+                        #print initial_state_grads_value
                         l1_norm = np.linalg.norm(initial_state_grads_value, ord=1)
                         l2_norm = np.linalg.norm(initial_state_grads_value, ord=None)
                         linf_norm = np.linalg.norm(initial_state_grads_value, ord=np.inf)
