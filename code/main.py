@@ -34,10 +34,7 @@ def train(params):
     #params.freqs = np.linspace(0, params.time_steps/3, 10).tolist()
     print "parameters = ", params 
 
-    if params.dataset.startswith('ptb') or params.dataset.startswith('charptb'): 
-        model = rnn_ptb.RNNModel(params)
-    else:
-        model = rnn.RNNModel(params)
+    model = rnn.RNNModel(params)
 
     # load model 
     if params.load_model: 
