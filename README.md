@@ -1,6 +1,6 @@
 # FRU
 
-Implementation of Fourier Recurrent Unit
+[ICML2018: Learning Long Term Dependencies via Fourier Recurrent Units](https://arxiv.org/pdf/1803.06585.pdf)
 
 by Jiong Zhang, Yibo Lin, Zhao Song, Inderjit S. Dhillon
 
