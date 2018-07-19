@@ -1,6 +1,26 @@
 import math 
 import tensorflow as tf
 from tensorflow.python.util import nest
+import collections
+import pdb 
+
+_FRUStateTuple = collections.namedtuple("FRUStateTuple", ("state", "t"))
+
+class FRUStateTuple(_FRUStateTuple):
+    """Tuple used by FRU Cells for `state_size`, `zero_state`, and output state.
+
+    Stores two elements: `(state, t)`, in that order. Where `state` is the hidden state
+    and `t` is the time step.
+    """
+    __slots__ = ()
+
+    @property
+    def dtype(self):
+        (state, t) = self
+        if state.dtype != t.dtype:
+            raise TypeError("Inconsistent internal state: %s vs %s" %
+                    (str(state.dtype), str(t.dtype)))
+        return state.dtype
 
 
 class FRUCell(tf.contrib.rnn.RNNCell):
@@ -34,7 +54,6 @@ class FRUCell(tf.contrib.rnn.RNNCell):
         # as tensorflow does not feed current time step to __call__ 
         # I have to manually record it 
         self._seq_len = seq_len
-        self._cur_time_step = 0
 
         self.W = []
         self.b = []
@@ -44,32 +63,21 @@ class FRUCell(tf.contrib.rnn.RNNCell):
     """
     @property
     def state_size(self):
-        return int(self._nfreqs * self._num_stats)
+        return FRUStateTuple(int(self._nfreqs * self._num_stats), 1)
 
     @property
     def output_size(self):
         return self._output_dims
 
-    """
-    current time step 
-    """
-    @property
-    def cur_time_step(self):
-        return self._cur_time_step
-
-    """
-    go to next time step 
-    """
-    def next_time_step(self): 
-        self._cur_time_step = (self._cur_time_step+1) % self._seq_len
-
-    def __call__(self, inputs, state, scope=None):
+    def __call__(self, inputs, state_tuple, scope=None):
         """
         recur*: r
-        state*: mu 
+        state*: mu, state_tuple includes (state, t) 
         stats*: phi 
         freq*: frequency vector 
         """
+        state, cur_time_step = state_tuple
+
         with tf.variable_scope(scope or type(self).__name__):
             self._freqs = tf.reshape(tf.get_variable("frequency", initializer=self._freqs_array, trainable=False), [1, -1, 1])
             self._phases = tf.reshape(tf.get_variable("phase", [self._nfreqs], initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32), trainable=True), [1, -1, 1])
@@ -100,12 +108,13 @@ class FRUCell(tf.contrib.rnn.RNNCell):
                 stats_tensor = tf.reshape(
                     stats, [-1, 1, self._num_stats], 'stats_tensor'
                 )
+                #cur_time_step = tf.Print(cur_time_step, [cur_time_step], message="cur_time_step = ")
                 """
                 mu_t = mask*mu_{t-1} + cos(2*pi*w*t/T + 2*pi*phase)*phi_t
                 """
                 out_state = tf.reshape(self._freqs_mask*state_tensor +
-                                       1.0/self._seq_len*tf.cos(2.0*math.pi/self._seq_len*self.cur_time_step*self._freqs + 2.0*math.pi*self._phases)*stats_tensor,
-                                       [-1, self.state_size], 'out_state')
+                                       1.0/self._seq_len*tf.cos(2.0*math.pi/self._seq_len*tf.reshape(cur_time_step, shape=[-1, 1, 1])*self._freqs + 2.0*math.pi*self._phases)*stats_tensor,
+                                       [-1, self.state_size.state], 'out_state')
             # Compute the output.
             if self._include_input:
                 output_vars = [out_state, inputs]
@@ -120,7 +129,7 @@ class FRUCell(tf.contrib.rnn.RNNCell):
             if not self._linear_out:
                 output = self._activation(output, name='output_act')
             # update time step 
-            self.next_time_step()
+            out_state_tuple = (out_state, cur_time_step+1)
 
             # Retrieve RNN Variables
             if not self.W: 
@@ -139,7 +148,7 @@ class FRUCell(tf.contrib.rnn.RNNCell):
             """
             o_t and mu_t 
             """
-            return (output, out_state)
+            return (output, out_state_tuple)
 
 
 # No longer publicly expose function in tensorflow.

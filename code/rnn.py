@@ -5,6 +5,8 @@
 #
 
 import math 
+import pickle
+import base64
 import tensorflow as tf 
 import numpy as np 
 import sru
@@ -12,6 +14,7 @@ import fru
 import Params  
 from tensorflow.python.ops import array_ops
 from tensorflow.python.util import nest
+import pdb 
 
 class RNNModel (object):
     def __init__(self, params):
@@ -48,7 +51,9 @@ class RNNModel (object):
             self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
         # running session 
-        self.session = tf.Session(config=tf.ConfigProto(device_count={'GPU' : int(params.gpu_flag)}))
+        config=tf.ConfigProto(device_count={'GPU' : int(params.gpu_flag)})
+        config.gpu_options.per_process_gpu_memory_fraction = 0.1
+        self.session = tf.Session(config=config)
         
         # batch size for validation 
         self.validate_batch_size = params.batch_size*4
@@ -361,6 +366,29 @@ class RNNModel (object):
     """
     def save(self, filename): 
         print "save model ", filename
+
+        def check_diagonal_dominated(x):
+            d = np.diag(np.abs(x))
+            s = np.sum(np.abs(x), axis=1) - d
+            if np.all(d > s):
+                return True
+            return False
+
+        #np.set_printoptions(threshold='nan')
+        for var in tf.trainable_variables():
+            print var.name
+            print var.get_shape().as_list()
+            if "recur_feats/Matrix" in var.name or "stats/Matrix" in var.name:
+                mat = self.session.run(var)
+                fname = "W1" if "recur_feats/Matrix" in var.name else "W2"
+                with open(fname+".pkl", "wb") as f:
+                    pickle.dump(mat, f)
+                mat_I = mat-np.eye(mat.shape[0], mat.shape[1])
+                print "matrix = ", mat
+                print "matrix-I = ", mat_I
+                print "matrix fro = ", np.linalg.norm(mat)
+                print "matrix-I fro = ", np.linalg.norm(mat_I)
+                #print "diagonal dominated = ", check_diagonal_dominated(mat)
 
         saver = tf.train.Saver()
         saver.save(self.session, filename)

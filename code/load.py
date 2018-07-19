@@ -14,6 +14,8 @@ import numpy as np
 import csv
 import pickle
 import sklearn
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split

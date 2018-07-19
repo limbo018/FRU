@@ -6,12 +6,15 @@
 
 import re 
 import numpy as np 
+import matplotlib 
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt 
+plt.rc('text', usetex=True) 
+plt.rc('font', family='serif')
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib import ticker
 from matplotlib import cm 
-import matplotlib
 
 def read(filename): 
     print "read ", filename 
@@ -354,12 +357,12 @@ elif dataset.startswith("poly_synthetic"):
         degree = int(extract.group(1))
         npoly = int(extract.group(2))
 
-        fig1 = plt.figure(1, figsize=(18, 14))
+        fig1 = plt.figure(1, figsize=(18, 10))
         grad_norms = ['L1', 'L2', 'LInf', 'LNInf']
-        data_fru = read_gradient_time("./repeat/poly_synthetic/%s/FRU.log" % (folder))
-        data_sru = read_gradient_time("./repeat/poly_synthetic/%s/SRU.log" % (folder))
-        data_lstm = read_gradient_time("./repeat/poly_synthetic/%s/LSTM.log" % (folder))
-        data_rnn = read_gradient_time("./repeat/poly_synthetic/%s/RNN.log" % (folder))
+        data_fru = read_gradient_time("./repeat.5/poly_synthetic/%s/FRU.log" % (folder))
+        data_sru = read_gradient_time("./repeat.5/poly_synthetic/%s/SRU.log" % (folder))
+        data_lstm = read_gradient_time("./repeat.5/poly_synthetic/%s/LSTM.log" % (folder))
+        data_rnn = read_gradient_time("./repeat.5/poly_synthetic/%s/RNN.log" % (folder))
         avg_time_step = 20
         lines = []
         for i in range(3):
@@ -383,7 +386,8 @@ elif dataset.startswith("poly_synthetic"):
                     #if i == 2: 
                     #    plt.legend(loc='center right', bbox_to_anchor=(1.5, 0.5), ncol=1, fontsize=8)
                     plt.title("%s Gradient %s Norm" % (model, grad_norms[i]))
-                    plt.xlabel('t')
+                    if i == 2: 
+                        plt.xlabel('t')
                     plt.gca().set_yscale('symlog', linthreshy=1e-5)
                     plt.ylim(-1e-5, 1e2)
 
@@ -393,7 +397,7 @@ elif dataset.startswith("poly_synthetic"):
         cbar.set_label('Epoch')
         plt.subplots_adjust()
         #plt.tight_layout()
-        filename = "./repeat/poly_synthetic.%s.grads_time.pdf" % (folder)
+        filename = "./repeat.5/poly_synthetic.%s.grads_time.pdf" % (folder)
         print filename
         plt.savefig(filename, bbox_inches='tight', pad_inches=0.0)
 
