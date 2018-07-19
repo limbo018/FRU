@@ -367,28 +367,28 @@ class RNNModel (object):
     def save(self, filename): 
         print "save model ", filename
 
-        def check_diagonal_dominated(x):
-            d = np.diag(np.abs(x))
-            s = np.sum(np.abs(x), axis=1) - d
-            if np.all(d > s):
-                return True
-            return False
+        #def check_diagonal_dominated(x):
+        #    d = np.diag(np.abs(x))
+        #    s = np.sum(np.abs(x), axis=1) - d
+        #    if np.all(d > s):
+        #        return True
+        #    return False
 
-        #np.set_printoptions(threshold='nan')
-        for var in tf.trainable_variables():
-            print var.name
-            print var.get_shape().as_list()
-            if "recur_feats/Matrix" in var.name or "stats/Matrix" in var.name:
-                mat = self.session.run(var)
-                fname = "W1" if "recur_feats/Matrix" in var.name else "W2"
-                with open(fname+".pkl", "wb") as f:
-                    pickle.dump(mat, f)
-                mat_I = mat-np.eye(mat.shape[0], mat.shape[1])
-                print "matrix = ", mat
-                print "matrix-I = ", mat_I
-                print "matrix fro = ", np.linalg.norm(mat)
-                print "matrix-I fro = ", np.linalg.norm(mat_I)
-                #print "diagonal dominated = ", check_diagonal_dominated(mat)
+        ##np.set_printoptions(threshold='nan')
+        #for var in tf.trainable_variables():
+        #    print var.name
+        #    print var.get_shape().as_list()
+        #    if "recur_feats/Matrix" in var.name or "stats/Matrix" in var.name:
+        #        mat = self.session.run(var)
+        #        fname = "W1" if "recur_feats/Matrix" in var.name else "W2"
+        #        with open(fname+".pkl", "wb") as f:
+        #            pickle.dump(mat, f)
+        #        mat_I = mat-np.eye(mat.shape[0], mat.shape[1])
+        #        print "matrix = ", mat
+        #        print "matrix-I = ", mat_I
+        #        print "matrix fro = ", np.linalg.norm(mat)
+        #        print "matrix-I fro = ", np.linalg.norm(mat_I)
+        #        #print "diagonal dominated = ", check_diagonal_dominated(mat)
 
         saver = tf.train.Saver()
         saver.save(self.session, filename)
